@@ -2,21 +2,29 @@ package service
 
 import (
 	"context"
-	"dca-bot/conf"
-	"dca-bot/noti"
+	"crypto/rand"
+	"dca-bot/models"
 	"encoding/json"
 	"fmt"
-	"github.com/adshao/go-binance/v2"
 	"log"
+	"math/big"
 	"strconv"
 	"sync"
 	"time"
+
+	"dca-bot/conf"
+	"dca-bot/noti"
+	"dca-bot/store"
+
+	"github.com/adshao/go-binance/v2"
 )
 
 const (
 	MAIN_SYMBOL = "BNBUSDT"
 	MAIN_ASSET  = "BNB"
 )
+
+var Fibonacci = []int64{1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 80000}
 
 type DCAService struct {
 	mu            sync.Mutex
@@ -27,32 +35,33 @@ type DCAService struct {
 	block               int64
 	intervalCheckTp     int64
 	intervalCheckBuy    int64
-
+	amountUsdtEachBlock float64
 	// tookProfit if this field is true my dream will become true
 	tookProfit bool
 
-	noti noti.TelegramNoti
+	noti       noti.TelegramNoti
+	orderStore store.OrderTrackingStore
 }
 
-func NewDCAService(biCli *binance.Client, config *conf.Config) *DCAService {
+func NewDCAService(biCli *binance.Client, notiSer noti.TelegramNoti, orderStore store.OrderTrackingStore, config *conf.Config) *DCAService {
 	return &DCAService{
-		mu:    sync.Mutex{},
-		biCli: biCli,
-		block: config.Bock,
-		intervalCheckTp: config.IntervalCheckTp,
-		intervalCheckBuy: config.IntervalCheckBuy,
+		mu:                  sync.Mutex{},
+		biCli:               biCli,
+		block:               config.Bock,
+		intervalCheckTp:     config.IntervalCheckTp,
+		intervalCheckBuy:    config.IntervalCheckBuy,
 		priceWillTookProfit: config.PriceWillTookProfit,
+		amountUsdtEachBlock: config.AmountUsdtEachBlock,
+		orderStore:          orderStore,
+		noti:                notiSer,
 	}
 }
 
-func (s *DCAService) Wallet() {
-}
-
-func (s *DCAService) MakeAnOrder() {
-	resp, err := s.biCli.NewCreateOrderService().Symbol("BNBUSDT").
+func (s *DCAService) MakeAnOrder(quantity string) {
+	resp, err := s.biCli.NewCreateOrderService().Symbol(MAIN_SYMBOL).
 		Side(binance.SideTypeBuy).
 		Type(binance.OrderTypeMarket).
-		Quantity("0.1").
+		Quantity(quantity).
 		Do(context.Background())
 	if err != nil {
 		panic(err)
@@ -91,25 +100,48 @@ func (s *DCAService) GetAccountInfo() (*binance.Account, error) {
 }
 
 func (s *DCAService) orderExec(sideType binance.SideType, quantity string) error {
-	resp, err := s.biCli.NewCreateOrderService().Symbol(MAIN_SYMBOL).
-		Side(sideType).
-		Type(binance.OrderTypeMarket).
-		Quantity(quantity).
-		Do(context.Background())
-	if err != nil {
-		panic(err)
+	fibonacciLevel := 1
+	for {
+		if fibonacciLevel > 12 {
+			_ = s.noti.Send("retry many time but not success, please check manual")
+			return fmt.Errorf("retry many time but not success")
+		}
+
+		resp, err := s.biCli.NewCreateOrderService().Symbol(MAIN_SYMBOL).
+			Side(sideType).
+			Type(binance.OrderTypeMarket).
+			Quantity(quantity).
+			Do(context.Background())
+		if err != nil {
+			time.Sleep(time.Duration(Fibonacci[fibonacciLevel]) * time.Second)
+			fibonacciLevel += 1
+			_ = s.noti.Send("orderExec error: " + err.Error())
+			log.Println(err, "orderExec internal server error")
+			continue
+		}
+
+		if resp.Status == binance.OrderStatusTypeFilled {
+			return nil
+		}
+		err = s.DoubleCheckOrder(resp.OrderID)
+		if err == nil {
+			return nil
+		}
+
+		time.Sleep(time.Duration(Fibonacci[fibonacciLevel]) * time.Second)
+		fibonacciLevel += 1
+		s.noti.Send("orderExec error: " + err.Error())
+		log.Println(err, "orderExec got an error")
 	}
 
-	if resp.Status == binance.OrderStatusTypeFilled {
-		return nil
-	}
-
-	time.Sleep(time.Second)
-	return s.DoubleCheckOrder(resp.OrderID)
 }
 
 func (s *DCAService) TPAllAhihi() {
+	fibonacciLevel := 1
 	for {
+		time.Sleep(time.Duration(Fibonacci[fibonacciLevel]) * time.Second)
+		fibonacciLevel += 1
+
 		account, err := s.GetAccountInfo()
 		if err != nil {
 			_ = s.noti.Send("TP but get error when get amount, please to manual")
@@ -130,9 +162,9 @@ func (s *DCAService) TPAllAhihi() {
 				return
 			}
 		}
-		time.Sleep(2 * time.Second)
 	}
 }
+
 func (s *DCAService) shouldTookProfit() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -173,6 +205,67 @@ func (s *DCAService) StartConsumerCheckTp() {
 	}
 }
 
+// random return [from, max)
+func random(from, max int64) int64 {
+	maxBig := big.NewInt(max - from)
+	for {
+		r, err := rand.Int(rand.Reader, maxBig)
+		if err == nil {
+			return from + r.Int64()
+		}
+	}
+}
+
+func (s *DCAService) handleBuyOrder(r *models.OrderTracking, currentNumInOneBlock int64) {
+	if r.Status == "SUCCESS" {
+		log.Println("[DEBUG] order is success, do nothing")
+		return
+	}
+
+	if currentNumInOneBlock != r.SelectedNum && r.SelectedNum != 0 {
+		log.Println("[DEBUG] not buy now, do nothing", currentNumInOneBlock, r.SelectedNum)
+		return
+	}
+
+	defer func() {
+		_ = s.orderStore.Save(context.Background(), r)
+	}()
+
+	prices, err := s.biCli.NewListPricesService().Symbol(MAIN_SYMBOL).Do(context.Background())
+	if err != nil {
+		log.Println(err, "got price error")
+		r.Error = fmt.Sprintf("%s\nget_price_error:%s", r.Error, err.Error())
+		r.Status = "ERROR"
+		return
+	}
+
+	for _, p := range prices {
+		if p.Symbol != MAIN_SYMBOL {
+			continue
+		}
+
+		nowPrice, err := strconv.ParseFloat(p.Price, 64)
+		if err != nil {
+			r.Error = fmt.Sprintf("%s\nparse_price_error:%s", r.Error, err.Error())
+			r.Status = "ERROR"
+			return
+		}
+
+		r.RawResponse = fmt.Sprintf("%s\nstart buy %f, price %f",r.RawResponse,s.amountUsdtEachBlock/nowPrice, nowPrice)
+		log.Printf("start buy %f, price %0.2f\n", s.amountUsdtEachBlock/nowPrice, nowPrice)
+		err = s.orderExec(binance.SideTypeBuy, fmt.Sprintf("%.2f", s.amountUsdtEachBlock/nowPrice))
+		if err != nil {
+			r.Error = fmt.Sprintf("%s\nmake_order_error:%s", r.Error, err.Error())
+			r.Status = "ERROR"
+			return
+		}
+		r.Status = "SUCCESS"
+		return
+	}
+
+	return
+}
+
 func (s *DCAService) checkBuy() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -181,11 +274,41 @@ func (s *DCAService) checkBuy() bool {
 		return true
 	}
 
-	log.Println("Buy success")
+	ts := time.Now().Unix()
+	indexNum := ts / s.block
+	mod := ts % s.block
+	currentIndexInBlock := mod / s.intervalCheckBuy
+	maxIndexInOneBlock := s.block / s.intervalCheckBuy
+
+	r, err := s.orderStore.GetOrderByIndexNum(context.Background(), indexNum)
+	if err != nil {
+		s.noti.Send("[ERROR] internal server" + err.Error())
+		log.Println(err, "internal server error")
+		return false
+	}
+
+	if r == nil {
+		selectedNum := random(0, maxIndexInOneBlock)
+		r = &models.OrderTracking{
+			IndexNum:    indexNum,
+			SelectedNum: selectedNum,
+			Status:      "NONE",
+			Error:       "",
+		}
+
+		err = s.orderStore.Save(context.Background(), r)
+		if err != nil {
+			s.noti.Send("[ERROR] checkBuy internal server" + err.Error())
+			log.Println(err, "checkBuy internal server error")
+			return false
+		}
+	}
+
+	s.handleBuyOrder(r, currentIndexInBlock)
 	return false
 }
 
-func (s *DCAService) StartConsumerCheckBuy()  {
+func (s *DCAService) StartConsumerCheckBuy() {
 	ticker := time.NewTicker(time.Duration(s.intervalCheckBuy) * time.Second)
 	defer ticker.Stop()
 	for _ = range ticker.C {

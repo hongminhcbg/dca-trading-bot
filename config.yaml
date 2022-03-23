@@ -2,7 +2,12 @@
 api_key: AGRYeKWvMcOSsg6STAhN7Ft9RRj76wpVcTPsaOcEgB1MfugMTfdGFIIU8OxyyhjG
 secret_key: 4A7dPmquWzeJ1teAnTxSNQBjvB2cqAaSMNN4mywgp5FP5k4zWBbosh1mS8kfkQok
 is_testnet: true
-bock: 10000
-interval_check_tp: 10
-interval_check_buy: 3
-price_will_took_profit: 406.18
+bock: 600
+interval_check_tp: 30
+interval_check_buy: 60
+price_will_took_profit: 500
+amount_usdt_each_block: 11
+mysql_dsn: root:12345678@tcp(localhost:3306)/dca_bot?parseTime=true
+noti:
+  url: "test"
+  chat_id: "test"
