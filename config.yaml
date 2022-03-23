@@ -6,3 +6,8 @@ bock: 10000
 interval_check_tp: 10
 interval_check_buy: 3
 price_will_took_profit: 406.18
+amount_usdt_each_block: 11.0
+mysql_dsn: root:12345678@tcp(localhost:3306)/trading_bot
+noti:
+  url: "test"
+  chat_id: "test"
