@@ -26,7 +26,7 @@ func (s *orderTrackingStoreImpl) Save(ctx context.Context, r *models.OrderTracki
 func (s *orderTrackingStoreImpl) GetOrderByIndexNum(ctx context.Context, indexNum int64) (*models.OrderTracking, error) {
 	var result models.OrderTracking
 	err := s.db.WithContext(ctx).Where("index_num = ?", indexNum).First(&result).Error
-	if err != gorm.ErrRecordNotFound {
+	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
 

@@ -57,11 +57,11 @@ func NewDCAService(biCli *binance.Client, notiSer noti.TelegramNoti, orderStore 
 	}
 }
 
-func (s *DCAService) MakeAnOrder() {
-	resp, err := s.biCli.NewCreateOrderService().Symbol("BNBUSDT").
+func (s *DCAService) MakeAnOrder(quantity string) {
+	resp, err := s.biCli.NewCreateOrderService().Symbol(MAIN_SYMBOL).
 		Side(binance.SideTypeBuy).
 		Type(binance.OrderTypeMarket).
-		Quantity("0.1").
+		Quantity(quantity).
 		Do(context.Background())
 	if err != nil {
 		panic(err)
@@ -117,6 +117,7 @@ func (s *DCAService) orderExec(sideType binance.SideType, quantity string) error
 			fibonacciLevel += 1
 			_ = s.noti.Send("orderExec error: " + err.Error())
 			log.Println(err, "orderExec internal server error")
+			continue
 		}
 
 		if resp.Status == binance.OrderStatusTypeFilled {
@@ -250,7 +251,9 @@ func (s *DCAService) handleBuyOrder(r *models.OrderTracking, currentNumInOneBloc
 			return
 		}
 
-		err = s.orderExec(binance.SideTypeBuy, fmt.Sprintf("%f", s.amountUsdtEachBlock/nowPrice))
+		r.RawResponse = fmt.Sprintf("%s\nstart buy %f, price %f",r.RawResponse,s.amountUsdtEachBlock/nowPrice, nowPrice)
+		log.Printf("start buy %f, price %0.2f\n", s.amountUsdtEachBlock/nowPrice, nowPrice)
+		err = s.orderExec(binance.SideTypeBuy, fmt.Sprintf("%.2f", s.amountUsdtEachBlock/nowPrice))
 		if err != nil {
 			r.Error = fmt.Sprintf("%s\nmake_order_error:%s", r.Error, err.Error())
 			r.Status = "ERROR"
@@ -286,7 +289,7 @@ func (s *DCAService) checkBuy() bool {
 
 	if r == nil {
 		selectedNum := random(0, maxIndexInOneBlock)
-		r := &models.OrderTracking{
+		r = &models.OrderTracking{
 			IndexNum:    indexNum,
 			SelectedNum: selectedNum,
 			Status:      "NONE",
