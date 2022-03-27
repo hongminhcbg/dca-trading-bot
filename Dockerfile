@@ -19,4 +19,5 @@ FROM alpine:3.14
 WORKDIR /app
 COPY --from=build /app/dca_bot ./dca_bot
 COPY --from=build /app/config.yaml ./config.yaml
+EXPOSE 80
 ENTRYPOINT ["/app/dca_bot"]
