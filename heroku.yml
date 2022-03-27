@@ -5,4 +5,4 @@ run:
   worker:
     command:
       - /app/dca_bot
-    worker: web
+    image: worker
