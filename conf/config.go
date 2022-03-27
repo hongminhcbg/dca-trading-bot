@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	Port string `json:"port" yaml:"port" mapstructure:"port"`
 	ApiKey              string  `json:"api_key" yaml:"api_key" mapstructure:"api_key"`
 	SecretKey           string  `json:"secret_key" yaml:"secret_key" mapstructure:"secret_key"`
 	IsTestnet           bool    `json:"is_testnet" yaml:"is_testnet" mapstructure:"is_testnet"`

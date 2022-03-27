@@ -8,6 +8,7 @@ interval_check_buy: 1800
 price_will_took_profit: 800
 amount_usdt_each_block: '11'
 mysql_dsn: root:12345678@tcp(localhost:3306)/dca_bot?parseTime=true
+port: '80'
 noti:
   url: "test"
   chat_id: "test"
