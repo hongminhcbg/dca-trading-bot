@@ -15,7 +15,7 @@ type Config struct {
 	Bock                int64   `json:"bock" yaml:"bock" mapstructure:"bock"`
 	IntervalCheckTp     int64   `json:"interval_check_tp" yaml:"interval_check_tp" mapstructure:"interval_check_tp"`
 	IntervalCheckBuy    int64   `json:"interval_check_buy" yaml:"interval_check_buy" mapstructure:"interval_check_buy"`
-	AmountUsdtEachBlock float64 `json:"amount_usdt_each_block" yaml:"amount_usdt_each_block" mapstructure:"amount_usdt_each_block"`
+	AmountUsdtEachBlock string  `json:"amount_usdt_each_block" yaml:"amount_usdt_each_block" mapstructure:"amount_usdt_each_block"`
 	Noti                *Noti   `json:"noti" yaml:"noti" mapstructure:"noti"`
 	MysqlDsn            string  `yaml:"mysql_dsn" json:"mysql_dsn" mapstructure:"mysql_dsn"`
 }
