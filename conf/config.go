@@ -37,12 +37,6 @@ func LoadConfig() (*Config, error) {
 		panic(fmt.Errorf("Fatal error config file: %w \n", err))
 	}
 
-	// debug, fucking bullshit viper
-	keys := viper.AllKeys()
-	fmt.Println("all key viper read = ", keys)
-	for _, k := range keys {
-		fmt.Printf("[DB]    k = %s, value = %v\n", k, viper.Get(k))
-	}
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, err
 	}
