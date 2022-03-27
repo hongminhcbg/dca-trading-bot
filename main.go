@@ -10,9 +10,6 @@ import (
 	"fmt"
 
 	binance "github.com/adshao/go-binance/v2"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
-
 	"log"
 	"os"
 	"syscall"
@@ -58,27 +55,4 @@ func main() {
 			}
 		}
 	}
-}
-
-func newDB(dsn string) *gorm.DB {
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	if err != nil {
-		panic(err)
-	}
-
-	sqlDB, err := db.DB()
-
-	if err != nil {
-		panic(err)
-	}
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-
-	// force a connection and test that it worked
-	err = sqlDB.Ping()
-	if err != nil {
-		panic(err)
-	}
-
-	return db
 }
