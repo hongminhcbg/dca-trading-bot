@@ -18,7 +18,7 @@ import (
 	"syscall"
 )
 
-func init()  {
+func init() {
 	b := make([]byte, 128)
 	rand.Read(b)
 }
@@ -45,8 +45,7 @@ func main() {
 		panic(err)
 	}
 
-	db := newDB(config.MysqlDsn)
-	orderTrackingStore := store.NewOrderTrackingStore(db)
+	orderTrackingStore := store.NewOrderCheckingStoreMapImpl()
 	s := service.NewDCAService(client, notiService, orderTrackingStore, config)
 	go s.StartConsumerCheckTp()
 	go s.StartConsumerCheckBuy()

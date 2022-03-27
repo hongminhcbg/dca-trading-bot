@@ -3,3 +3,4 @@
 vendor/
 main
 docker-compose.yaml
+start_local.sh
