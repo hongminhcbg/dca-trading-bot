@@ -46,6 +46,7 @@ func main() {
 	s := service.NewDCAService(client, notiService, orderTrackingStore, config)
 	go s.StartConsumerCheckTp()
 	go s.StartConsumerCheckBuy()
+	go s.StartWebServer()
 	for {
 		select {
 		case sig := <-osSignal:
