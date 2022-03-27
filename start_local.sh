@@ -1,5 +1,0 @@
-# config use for test only
-export API_KEY=AGRYeKWvMcOSsg6STAhN7Ft9RRj76wpVcTPsaOcEgB1MfugMTfdGFIIU8OxyyhjG
-export SECRET_KEY=4A7dPmquWzeJ1teAnTxSNQBjvB2cqAaSMNN4mywgp5FP5k4zWBbosh1mS8kfkQok
-export NOTI__URL=https://api.telegram.org/bot5290479733:AAHQcF79wjdJq581J9bTjcs7_F_kHqgT-IY/sendMessage
-export NOTI__CHAT_ID='-682377669'
