@@ -10,6 +10,7 @@ amount_usdt_each_block: '11'
 mysql_dsn: root:12345678@tcp(localhost:3306)/dca_bot?parseTime=true
 postgres_dns: 'host=localhost user=postgres password=example dbname=dca_bot port=5432 sslmode=disable TimeZone=Asia/Shanghai'
 port: '80'
+database_url: test
 noti:
   url: "test"
   chat_id: "test"

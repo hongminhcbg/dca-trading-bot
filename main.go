@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -31,7 +32,7 @@ func main() {
 
 	b, _ := json.MarshalIndent(config, "", "\t")
 	fmt.Println("start server with config", string(b))
-	db := mustConnectPostgres(config.PostgresDns)
+	db := mustConnectPsqlv2(config)
 
 	binance.UseTestnet = config.IsTestnet
 	client := binance.NewClient(config.ApiKey, config.SecretKey)
@@ -70,6 +71,30 @@ func main() {
 
 func mustConnectPostgres(dsn string) *gorm.DB {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
+
+	sqlDb, err := db.DB()
+	if err != nil {
+		panic(err)
+	}
+
+	err = sqlDb.Ping()
+	if err != nil {
+		panic(err)
+	}
+
+	return db
+}
+
+func mustConnectPsqlv2(cfg *conf.Config) *gorm.DB {
+	dbPsql, err := sql.Open("postgres", cfg.DatabaseUrl)
+	if err != nil {
+		panic(err)
+	}
+
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: dbPsql}), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}

@@ -20,6 +20,7 @@ type Config struct {
 	Noti                *Noti   `json:"noti" yaml:"noti" mapstructure:"noti"`
 	MysqlDsn            string  `yaml:"mysql_dsn" json:"mysql_dsn" mapstructure:"mysql_dsn"`
 	PostgresDns         string  `yaml:"postgres_dns" json:"postgres_dns" mapstructure:"postgres_dns"`
+	DatabaseUrl         string  `yaml:"database_url" json:"database_url" mapstructure:"database_url"`
 }
 
 type Noti struct {
