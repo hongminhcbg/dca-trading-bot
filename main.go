@@ -2,17 +2,20 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"syscall"
+
+	binance "github.com/adshao/go-binance/v2"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
 	"dca-bot/conf"
 	"dca-bot/noti"
 	"dca-bot/service"
 	"dca-bot/store"
-	"encoding/json"
-	"fmt"
-
-	binance "github.com/adshao/go-binance/v2"
-	"log"
-	"os"
-	"syscall"
 )
 
 func init() {
@@ -28,6 +31,7 @@ func main() {
 
 	b, _ := json.MarshalIndent(config, "", "\t")
 	fmt.Println("start server with config", string(b))
+	db := mustConnectPostgres(config.PostgresDns)
 
 	binance.UseTestnet = config.IsTestnet
 	client := binance.NewClient(config.ApiKey, config.SecretKey)
@@ -39,10 +43,15 @@ func main() {
 
 	err = notiService.Send("server will start now")
 	if err != nil {
-		panic(err)
+		if !config.IsTestnet {
+			panic(err)
+		}
+
+		log.Println("[ERROR] send noti error")
 	}
 
-	orderTrackingStore := store.NewOrderCheckingStoreMapImpl()
+	//orderTrackingStore := store.NewOrderCheckingStoreMapImpl()
+	orderTrackingStore := store.NewOrderTrackingPostgresImpl(db)
 	s := service.NewDCAService(client, notiService, orderTrackingStore, config)
 	go s.StartConsumerCheckTp()
 	go s.StartConsumerCheckBuy()
@@ -51,9 +60,29 @@ func main() {
 		select {
 		case sig := <-osSignal:
 			if sig == syscall.SIGKILL || sig == syscall.SIGINT {
-				log.Println("Receive signal kill, stop")
+				log.Println("Received signal kill, stop")
+				_ = orderTrackingStore.Close()
 				os.Exit(0)
 			}
 		}
 	}
+}
+
+func mustConnectPostgres(dsn string) *gorm.DB {
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
+
+	sqlDb, err := db.DB()
+	if err != nil {
+		panic(err)
+	}
+
+	err = sqlDb.Ping()
+	if err != nil {
+		panic(err)
+	}
+
+	return db
 }

@@ -8,17 +8,18 @@ import (
 )
 
 type Config struct {
-	Port string `json:"port" yaml:"port" mapstructure:"port"`
+	Port                string  `json:"port" yaml:"port" mapstructure:"port"`
 	ApiKey              string  `json:"api_key" yaml:"api_key" mapstructure:"api_key"`
 	SecretKey           string  `json:"secret_key" yaml:"secret_key" mapstructure:"secret_key"`
 	IsTestnet           bool    `json:"is_testnet" yaml:"is_testnet" mapstructure:"is_testnet"`
 	PriceWillTookProfit float64 `json:"price_will_took_profit" yaml:"price_will_took_profit" mapstructure:"price_will_took_profit"`
-	Bock                int64   `json:"bock" yaml:"bock" mapstructure:"bock"`
+	Block               int64   `json:"block" yaml:"block" mapstructure:"block"`
 	IntervalCheckTp     int64   `json:"interval_check_tp" yaml:"interval_check_tp" mapstructure:"interval_check_tp"`
 	IntervalCheckBuy    int64   `json:"interval_check_buy" yaml:"interval_check_buy" mapstructure:"interval_check_buy"`
 	AmountUsdtEachBlock string  `json:"amount_usdt_each_block" yaml:"amount_usdt_each_block" mapstructure:"amount_usdt_each_block"`
 	Noti                *Noti   `json:"noti" yaml:"noti" mapstructure:"noti"`
 	MysqlDsn            string  `yaml:"mysql_dsn" json:"mysql_dsn" mapstructure:"mysql_dsn"`
+	PostgresDns         string  `yaml:"postgres_dns" json:"postgres_dns" mapstructure:"postgres_dns"`
 }
 
 type Noti struct {

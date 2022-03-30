@@ -47,7 +47,7 @@ func NewDCAService(biCli *binance.Client, notiSer noti.TelegramNoti, orderStore 
 	return &DCAService{
 		mu:                  sync.Mutex{},
 		biCli:               biCli,
-		block:               config.Bock,
+		block:               config.Block,
 		intervalCheckTp:     config.IntervalCheckTp,
 		intervalCheckBuy:    config.IntervalCheckBuy,
 		priceWillTookProfit: config.PriceWillTookProfit,
@@ -72,20 +72,23 @@ func (s *DCAService) MakeAnOrder(quantity string) {
 	s.DoubleCheckOrder(resp.OrderID)
 }
 
-func (s *DCAService) DoubleCheckOrder(orderId int64) (string, error) {
+func (s *DCAService) DoubleCheckOrder(orderId int64) (string, *models.OrderExecuted, error) {
 	order, err := s.biCli.NewGetOrderService().Symbol(MAIN_SYMBOL).
 		OrderID(orderId).Do(context.Background())
 	if err != nil {
 		fmt.Println("DoubleCheckOrder error", err)
-		return "", err
+		return "", nil, err
 	}
 
 	if order.Status == binance.OrderStatusTypeFilled {
 		b, _ := json.MarshalIndent(order, "", "\t")
-		return string(b), nil
+		return string(b), &models.OrderExecuted{
+			ExecutedQty: order.ExecutedQuantity,
+			UsdtQty:     order.CummulativeQuoteQuantity,
+		}, nil
 	}
 
-	return "", fmt.Errorf("order status is %s", order.Status)
+	return "", nil, fmt.Errorf("order status is %s", order.Status)
 }
 
 func (s *DCAService) GetAccountInfo() (*binance.Account, error) {
@@ -100,12 +103,12 @@ func (s *DCAService) GetAccountInfo() (*binance.Account, error) {
 	return res, nil
 }
 
-func (s *DCAService) orderExec(sideType binance.SideType, QuoteOrderQty string, Quantity string) (string, error) {
+func (s *DCAService) orderExec(sideType binance.SideType, QuoteOrderQty string, Quantity string) (string, *models.OrderExecuted, error) {
 	fibonacciLevel := 1
 	for {
 		if fibonacciLevel > 12 {
 			_ = s.noti.Send("retry many time but not success, please check manual")
-			return "", fmt.Errorf("retry many time but not success")
+			return "", nil, fmt.Errorf("retry many time but not success")
 		}
 
 		cli := s.biCli.NewCreateOrderService().Symbol(MAIN_SYMBOL).
@@ -128,12 +131,15 @@ func (s *DCAService) orderExec(sideType binance.SideType, QuoteOrderQty string, 
 
 		if resp.Status == binance.OrderStatusTypeFilled {
 			b, _ := json.MarshalIndent(resp, "", "\t")
-			return string(b), nil
+			return string(b), &models.OrderExecuted{
+				ExecutedQty: resp.ExecutedQuantity,
+				UsdtQty:     resp.CummulativeQuoteQuantity,
+			}, nil
 		}
 
-		raw, err := s.DoubleCheckOrder(resp.OrderID)
+		raw, result, err := s.DoubleCheckOrder(resp.OrderID)
 		if err == nil {
-			return raw, nil
+			return raw, result, nil
 		}
 
 		time.Sleep(time.Duration(Fibonacci[fibonacciLevel]) * time.Second)
@@ -162,7 +168,7 @@ func (s *DCAService) TPAllAhihi() {
 			}
 
 			qty, _ := strconv.ParseFloat(asset.Free, 64)
-			_, err = s.orderExec(binance.SideTypeSell, "", fmt.Sprintf("%0.2f", qty))
+			_, _, err = s.orderExec(binance.SideTypeSell, "", fmt.Sprintf("%0.2f", qty))
 			if err == nil {
 				log.Printf("sell success %f BNB\n", qty)
 				//_ = s.noti.Send("TP success, congrats")
@@ -238,14 +244,20 @@ func (s *DCAService) handleBuyOrder(r *models.OrderTracking, currentNumInOneBloc
 		_ = s.orderStore.Save(context.Background(), r)
 	}()
 
-	raw, err := s.orderExec(binance.SideTypeBuy, s.amountUsdtEachBlock, "")
+	raw, orderDetail, err := s.orderExec(binance.SideTypeBuy, s.amountUsdtEachBlock, "")
 	if err != nil {
 		r.Error = fmt.Sprintf("%s\nmake_order_error:%s", r.Error, err.Error())
 		r.Status = "ERROR"
 		return
 	}
+
+	t := time.Now()
 	r.Status = "SUCCESS"
+	r.ExecutedQty = orderDetail.ExecutedQty
+	r.UsdtQty = orderDetail.UsdtQty
+	r.UpdatedAt = &t
 	s.noti.Send(raw)
+	log.Println("order is success", orderDetail.UsdtQty, orderDetail.ExecutedQty)
 	return
 }
 
