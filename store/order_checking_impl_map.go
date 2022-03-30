@@ -34,3 +34,11 @@ func (x *orderCheckingStoreMapImpl) Save(ctx context.Context, r *models.OrderTra
 
 	return nil
 }
+
+func (x *orderCheckingStoreMapImpl) Close() error {
+	for k, _ := range x.data {
+		delete(x.data, k)
+	}
+
+	return nil
+}

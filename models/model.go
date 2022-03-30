@@ -9,6 +9,8 @@ type OrderTracking struct {
 	Status      string     `json:"status" gorm:"column:status"`
 	Error       string     `json:"error" gorm:"column:error"`
 	RawResponse string     `json:"raw_response" gorm:"column:raw_response"`
+	ExecutedQty string     `json:"executed_qty" gorm:"column:executed_qty"`
+	UsdtQty     string     `json:"usdt_qty" gorm:"column:usdt_qty"`
 	CreatedAt   *time.Time `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt   *time.Time `json:"updated_at" gorm:"column:updated_at"`
 }
