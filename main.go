@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	binance "github.com/adshao/go-binance/v2"
+	_ "github.com/lib/pq"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
