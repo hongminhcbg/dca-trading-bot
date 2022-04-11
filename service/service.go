@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"dca-bot/logs"
 	"dca-bot/models"
 	"encoding/json"
 	"fmt"
@@ -125,7 +126,7 @@ func (s *DCAService) orderExec(sideType binance.SideType, QuoteOrderQty string, 
 			time.Sleep(time.Duration(Fibonacci[fibonacciLevel]) * time.Second)
 			fibonacciLevel += 1
 			_ = s.noti.Send("orderExec error: " + err.Error())
-			log.Println(err, "orderExec internal server error")
+			logs.Error(err, "orderExec internal server error")
 			continue
 		}
 
@@ -145,7 +146,7 @@ func (s *DCAService) orderExec(sideType binance.SideType, QuoteOrderQty string, 
 		time.Sleep(time.Duration(Fibonacci[fibonacciLevel]) * time.Second)
 		fibonacciLevel += 1
 		s.noti.Send("orderExec error: " + err.Error())
-		log.Println(err, "orderExec got an error")
+		logs.Error(err, "orderExec got an error")
 	}
 
 }
@@ -184,7 +185,7 @@ func (s *DCAService) shouldTookProfit() bool {
 
 	prices, err := s.biCli.NewListPricesService().Symbol(MAIN_SYMBOL).Do(context.Background())
 	if err != nil {
-		log.Println(err, "got price error")
+		logs.Error(err, "got price error")
 		return false
 	}
 
@@ -195,11 +196,11 @@ func (s *DCAService) shouldTookProfit() bool {
 
 		nowPrice, err := strconv.ParseFloat(p.Price, 64)
 		if err != nil || nowPrice < s.priceWillTookProfit {
-			log.Printf("now price is %f, too low\n", nowPrice)
+			logs.Info(fmt.Sprintf("now price is %f, too low", nowPrice))
 			continue
 		}
 
-		log.Println("Congrats, we will TP at price: ", nowPrice)
+		logs.Info("Congrats, we will TP at price: ", "now_price", nowPrice)
 		go s.TPAllAhihi()
 		s.tookProfit = true
 		return true
@@ -231,12 +232,12 @@ func random(from, max int64) int64 {
 
 func (s *DCAService) handleBuyOrder(r *models.OrderTracking, currentNumInOneBlock int64) {
 	if r.Status == "SUCCESS" {
-		log.Println("[DEBUG] order is success, do nothing")
+		logs.Info("[DEBUG] order is success, do nothing")
 		return
 	}
 
 	if currentNumInOneBlock != r.SelectedNum && r.SelectedNum != 0 {
-		log.Println("[DEBUG] not buy now, do nothing", currentNumInOneBlock, r.SelectedNum)
+		logs.Info("[DEBUG] not buy now, do nothing", "currentNumInOneBlock", currentNumInOneBlock, "SelectedNum", r.SelectedNum)
 		return
 	}
 
@@ -257,7 +258,7 @@ func (s *DCAService) handleBuyOrder(r *models.OrderTracking, currentNumInOneBloc
 	r.UsdtQty = orderDetail.UsdtQty
 	r.UpdatedAt = &t
 	s.noti.Send(raw)
-	log.Println("order is success", orderDetail.UsdtQty, orderDetail.ExecutedQty)
+	logs.Info("order is success", "UsdtQty", orderDetail.UsdtQty, "ExecutedQty", orderDetail.ExecutedQty)
 	return
 }
 
@@ -265,7 +266,7 @@ func (s *DCAService) checkBuy() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.tookProfit {
-		log.Println("do nothing because took profit, please restart service manual")
+		logs.Info("do nothing because took profit, please restart service manual")
 		return true
 	}
 
@@ -278,7 +279,7 @@ func (s *DCAService) checkBuy() bool {
 	r, err := s.orderStore.GetOrderByIndexNum(context.Background(), indexNum)
 	if err != nil {
 		s.noti.Send("[ERROR] internal server" + err.Error())
-		log.Println(err, "internal server error")
+		logs.Error(err, "internal server error")
 		return false
 	}
 
@@ -294,7 +295,7 @@ func (s *DCAService) checkBuy() bool {
 		err = s.orderStore.Save(context.Background(), r)
 		if err != nil {
 			s.noti.Send("[ERROR] checkBuy internal server" + err.Error())
-			log.Println(err, "checkBuy internal server error")
+			logs.Error(err, "checkBuy internal server error")
 			return false
 		}
 	}

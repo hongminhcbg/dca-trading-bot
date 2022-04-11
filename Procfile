@@ -1,1 +1,0 @@
-web: /app/dca_bot

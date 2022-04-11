@@ -3,9 +3,9 @@ package main
 import (
 	"crypto/rand"
 	"database/sql"
+	"dca-bot/logs"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"syscall"
 
@@ -30,6 +30,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	logs.Init(config)
 
 	b, _ := json.MarshalIndent(config, "", "\t")
 	fmt.Println("start server with config", string(b))
@@ -49,7 +50,7 @@ func main() {
 			panic(err)
 		}
 
-		log.Println("[ERROR] send noti error")
+		logs.Info("[ERROR] send noti error")
 	}
 
 	//orderTrackingStore := store.NewOrderCheckingStoreMapImpl()
@@ -62,7 +63,7 @@ func main() {
 		select {
 		case sig := <-osSignal:
 			if sig == syscall.SIGKILL || sig == syscall.SIGINT {
-				log.Println("Received signal kill, stop")
+				logs.Info("Received signal kill, stop")
 				_ = orderTrackingStore.Close()
 				os.Exit(0)
 			}
