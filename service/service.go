@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/big"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -58,20 +59,20 @@ func NewDCAService(biCli *binance.Client, notiSer noti.TelegramNoti, orderStore 
 	}
 }
 
-func (s *DCAService) MakeAnOrder(quantity string) {
-	resp, err := s.biCli.NewCreateOrderService().Symbol(MAIN_SYMBOL).
-		Side(binance.SideTypeBuy).
-		Type(binance.OrderTypeMarket).
-		QuoteOrderQty("11.0").
-		Do(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-	b, _ := json.MarshalIndent(resp, "", "\t")
-	fmt.Println("create order success", string(b))
-	s.DoubleCheckOrder(resp.OrderID)
-}
+// func (s *DCAService) MakeAnOrder(quantity string) {
+// 	resp, err := s.biCli.NewCreateOrderService().Symbol(MAIN_SYMBOL).
+// 		Side(binance.SideTypeBuy).
+// 		Type(binance.OrderTypeMarket).
+// 		QuoteOrderQty("11.0").
+// 		Do(context.Background())
+// 	if err != nil {
+// 		panic(err)
+// 	}
+//
+// 	b, _ := json.MarshalIndent(resp, "", "\t")
+// 	fmt.Println("create order success", string(b))
+// 	s.DoubleCheckOrder(resp.OrderID)
+// }
 
 func (s *DCAService) DoubleCheckOrder(orderId int64) (string, *models.OrderExecuted, error) {
 	order, err := s.biCli.NewGetOrderService().Symbol(MAIN_SYMBOL).
@@ -104,6 +105,22 @@ func (s *DCAService) GetAccountInfo() (*binance.Account, error) {
 	return res, nil
 }
 
+func (s *DCAService) shouldRetry(err error) bool {
+	if err == nil {
+		panic("fucking noob")
+	}
+
+	if strings.Contains(err.Error(), "code=-2010") {
+		return false
+	}
+
+	if strings.Contains(err.Error(), "code=-2015") {
+		return false
+	}
+
+	return true
+}
+
 func (s *DCAService) orderExec(sideType binance.SideType, QuoteOrderQty string, Quantity string) (string, *models.OrderExecuted, error) {
 	fibonacciLevel := 1
 	for {
@@ -123,10 +140,14 @@ func (s *DCAService) orderExec(sideType binance.SideType, QuoteOrderQty string, 
 
 		resp, err := cli.Do(context.Background())
 		if err != nil {
-			time.Sleep(time.Duration(Fibonacci[fibonacciLevel]) * time.Second)
-			fibonacciLevel += 1
 			_ = s.noti.Send("orderExec error: " + err.Error())
 			logs.Error(err, "orderExec internal server error")
+			if !s.shouldRetry(err) {
+				return "", nil, err
+			}
+
+			time.Sleep(time.Duration(Fibonacci[fibonacciLevel]) * time.Second)
+			fibonacciLevel += 1
 			continue
 		}
 
@@ -145,10 +166,8 @@ func (s *DCAService) orderExec(sideType binance.SideType, QuoteOrderQty string, 
 
 		time.Sleep(time.Duration(Fibonacci[fibonacciLevel]) * time.Second)
 		fibonacciLevel += 1
-		s.noti.Send("orderExec error: " + err.Error())
 		logs.Error(err, "orderExec got an error")
 	}
-
 }
 
 func (s *DCAService) TPAllAhihi() {
